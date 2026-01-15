@@ -1,0 +1,2 @@
+secsgem
+PySide6
