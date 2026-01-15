@@ -1,4 +1,5 @@
 import sys
+import os
 import time
 import logging
 import secsgem.common
@@ -7,7 +8,7 @@ import secsgem.hsms
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, 
-    QLabel, QLineEdit, QPushButton, QHBoxLayout, QTextEdit
+    QLabel, QLineEdit, QPushButton, QHBoxLayout, QTextEdit, QComboBox
 )
 
 class LogHandler(QObject, logging.Handler):
@@ -54,6 +55,20 @@ class TestHostWindow(QMainWindow):
         self.send_button = QPushButton("Send Remote Command")
         self.send_button.clicked.connect(self.on_send_command)
         self.layout.addWidget(self.send_button)
+        
+        self.request_recipes_button = QPushButton("Request Recipe List (S7F19)")
+        self.request_recipes_button.clicked.connect(self.on_request_recipes)
+        self.layout.addWidget(self.request_recipes_button)
+        
+        self.rcp_label = QLabel("Wafer Recipes (.rcp):")
+        self.layout.addWidget(self.rcp_label)
+        self.rcp_combo = QComboBox()
+        self.layout.addWidget(self.rcp_combo)
+        
+        self.job_label = QLabel("Batch Jobs (.job):")
+        self.layout.addWidget(self.job_label)
+        self.job_combo = QComboBox()
+        self.layout.addWidget(self.job_combo)
         
         # Log Area
         self.log_label = QLabel("Communication Log:")
@@ -108,6 +123,26 @@ class TestHostWindow(QMainWindow):
             self.append_log(f"Received S2F42 Reply: {response}")
         except Exception as e:
             self.append_log(f"Error sending command: {e}")
+
+    def on_request_recipes(self):
+        try:
+            response = self.host.get_process_program_list()
+            self.append_log(f"Received S7F20 Reply: {response}")
+            
+            self.rcp_combo.clear()
+            self.job_combo.clear()
+            
+            for r in response:
+                name = os.path.basename(r)
+                if name.lower().endswith('.rcp'):
+                    self.rcp_combo.addItem(name, r)
+                elif name.lower().endswith('.job'):
+                    self.job_combo.addItem(name, r)
+
+        except Exception as e:
+            self.append_log(f"Error sending command: {e}")
+        
+
 
     def closeEvent(self, event):
         self.host.disable()
