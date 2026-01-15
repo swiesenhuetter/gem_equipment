@@ -90,18 +90,24 @@ class TestHostWindow(QMainWindow):
         sb.setValue(sb.maximum())
 
     def on_enable_host(self):
-        print("Enabling host...")
+        self.append_log("Enabling host...")
         self.host.enable()
 
     def on_disable_host(self):
-        print("Disabling host...")
+        self.append_log("Disabling host...")
         self.host.disable()
 
     def on_send_command(self):
         recipe_name = self.recipe_input.text()
         # Send S2F41 (Host Command)
-        print(f"Sending VerifyRecipe with RecipeName={recipe_name}")
-        self.host.send_remote_command("VerifyRecipe", [("RecipeName", recipe_name)])
+        self.append_log(f"Sending VerifyRecipe with RecipeName={recipe_name}")
+        
+        # send_remote_command waits for the S2F42 reply and returns it
+        try:
+            response = self.host.send_remote_command("VerifyRecipe", [("RecipeName", recipe_name)])
+            self.append_log(f"Received S2F42 Reply: {response}")
+        except Exception as e:
+            self.append_log(f"Error sending command: {e}")
 
     def closeEvent(self, event):
         self.host.disable()
