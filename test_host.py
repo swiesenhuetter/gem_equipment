@@ -2,7 +2,7 @@ import sys
 import os
 import time
 import logging
-import secsgem.common
+from secsgem.common import state_machine
 import secsgem.gem
 import secsgem.hsms
 from PySide6.QtCore import QObject, Signal
@@ -36,11 +36,11 @@ class TestHostWindow(QMainWindow):
         # Host Control Buttons
         self.control_layout = QHBoxLayout()
         self.enable_button = QPushButton("Enable Host")
-        self.enable_button.clicked.connect(self.on_enable_host)
+        self.enable_button.clicked.connect(self.enable_host)
         self.control_layout.addWidget(self.enable_button)
         
         self.disable_button = QPushButton("Disable Host")
-        self.disable_button.clicked.connect(self.on_disable_host)
+        self.disable_button.clicked.connect(self.disable_host)
         self.control_layout.addWidget(self.disable_button)
         
         self.layout.addLayout(self.control_layout)
@@ -48,13 +48,18 @@ class TestHostWindow(QMainWindow):
         self.recipe_label = QLabel("Recipe Name:")
         self.layout.addWidget(self.recipe_label)
         
+        # Recipe Input and Verify Button Layout
+        self.recipe_layout = QHBoxLayout()
+        
         self.recipe_input = QLineEdit()
         self.recipe_input.setText("example_recipe.rcp")
-        self.layout.addWidget(self.recipe_input)
+        self.recipe_layout.addWidget(self.recipe_input)
         
-        self.send_button = QPushButton("Send Remote Command")
+        self.send_button = QPushButton("Verify Recipe")
         self.send_button.clicked.connect(self.on_send_command)
-        self.layout.addWidget(self.send_button)
+        self.recipe_layout.addWidget(self.send_button)
+        
+        self.layout.addLayout(self.recipe_layout)
         
         self.request_recipes_button = QPushButton("Request Recipe List (S7F19)")
         self.request_recipes_button.clicked.connect(self.on_request_recipes)
@@ -96,7 +101,7 @@ class TestHostWindow(QMainWindow):
         )
         
         self.host = TestHost(self.settings)
-        self.host.enable()
+        self.enable_host()
         
     def append_log(self, text):
         self.log_area.append(text)
@@ -104,13 +109,20 @@ class TestHostWindow(QMainWindow):
         sb = self.log_area.verticalScrollBar()
         sb.setValue(sb.maximum())
 
-    def on_enable_host(self):
+    def enable_host(self):
         self.append_log("Enabling host...")
-        self.host.enable()
+        try:
+            self.host.enable()
+        except state_machine.WrongSourceStateError:
+            self.append_log("Error: Host is already enabled.")
 
-    def on_disable_host(self):
+
+    def disable_host(self):
         self.append_log("Disabling host...")
-        self.host.disable()
+        try:
+            self.host.disable()
+        except state_machine.WrongSourceStateError:
+            self.append_log("Error: Host is not enabled.")
 
     def on_send_command(self):
         recipe_name = self.recipe_input.text()
@@ -145,7 +157,7 @@ class TestHostWindow(QMainWindow):
 
 
     def closeEvent(self, event):
-        self.host.disable()
+        self.disable_host()
         super().closeEvent(event)
 
 class TestHost(secsgem.gem.GemHostHandler):
