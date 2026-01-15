@@ -1,17 +1,31 @@
 import sys
 import time
+import logging
 import secsgem.common
 import secsgem.gem
 import secsgem.hsms
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, 
-    QLabel, QLineEdit, QPushButton, QHBoxLayout
+    QLabel, QLineEdit, QPushButton, QHBoxLayout, QTextEdit
 )
+
+class LogHandler(QObject, logging.Handler):
+    new_log = Signal(str)
+
+    def __init__(self):
+        QObject.__init__(self)
+        logging.Handler.__init__(self)
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.new_log.emit(msg)
 
 class TestHostWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SECS/GEM Host Simulator")
+        self.resize(800, 600)
         
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -41,6 +55,24 @@ class TestHostWindow(QMainWindow):
         self.send_button.clicked.connect(self.on_send_command)
         self.layout.addWidget(self.send_button)
         
+        # Log Area
+        self.log_label = QLabel("Communication Log:")
+        self.layout.addWidget(self.log_label)
+        
+        self.log_area = QTextEdit()
+        self.log_area.setReadOnly(True)
+        self.layout.addWidget(self.log_area)
+        
+        # Setup Logging
+        self.log_handler = LogHandler()
+        self.log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        self.log_handler.new_log.connect(self.append_log)
+        
+        # Configure secsgem logger to capture all messages
+        secsgem_logger = logging.getLogger("secsgem")
+        secsgem_logger.setLevel(logging.DEBUG)
+        secsgem_logger.addHandler(self.log_handler)
+        
         self.settings = secsgem.hsms.HsmsSettings(
             address="127.0.0.1",
             port=5000,
@@ -51,6 +83,12 @@ class TestHostWindow(QMainWindow):
         self.host = TestHost(self.settings)
         self.host.enable()
         
+    def append_log(self, text):
+        self.log_area.append(text)
+        # Auto scroll to bottom
+        sb = self.log_area.verticalScrollBar()
+        sb.setValue(sb.maximum())
+
     def on_enable_host(self):
         print("Enabling host...")
         self.host.enable()
